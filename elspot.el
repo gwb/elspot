@@ -111,4 +111,5 @@ _i_  : fetch info              %s(identity spotify--playback)
 
 
 
-
+(provide 'elspot)
+;;; elspot.el ends here
