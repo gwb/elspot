@@ -169,21 +169,6 @@
                      :uri (get-uri it))
                     entries))))
 
-;; TODO:
-;; - implement token-reuse feature
-;; (defun spotify--search-api (search type limit offset refresh-auth)
-;;   (let* ((access-token (if refresh-auth
-;;                            (spotify--get-access-token t)
-;;                          spotify-access-token))
-;;          (query-result-raw (shell-command-to-string
-;;                             (spotify--build-search-query
-;;                              search
-;;                              type limit
-;;                              offset
-;;                              (spotify--get-access-token t))))) 
-;;     (spotify--parse-search-query-result query-result-raw)))
-
-
 (defun spotify--token-error? (query-result)
   (gethash "error" query-result))
 
@@ -206,7 +191,7 @@
 ;; User interface
 (defun spotify-hydra-search-api (search)
   (setq spotify--search-result (spotify--search-api search "track" 4 0 nil))
-  (hydra-spot-test/body))
+  (hydra-spotify-list/body))
 
 
 (defun spotify-prompt-search ()
@@ -224,37 +209,76 @@
 (defun sr--album (idx)
   (s-fit (plist-get (nth idx spotify--search-result) :album) 25))
 
+
 (defun spotify--play-uri (uri)
   (let ((cmd (format "play track \"%s\"" uri)))
     (spotify--cmd cmd)))
 
-(defun spotify--play-1 ()
-  (interactive)
-  (spotify--play-uri (plist-get (nth 0 spotify--search-result) :uri))
-  (hydra-spotify/body))
 
-(defun spotify--play-2 ()
-  (interactive)
-  (spotify--play-uri (plist-get (nth 1 spotify--search-result) :uri))
-  (hydra-spotify/body))
+(defmacro spotify--setup-play-fns ()
+  (let ((fn-name-lst (--map (intern (format "spotify--play-%s" it))
+                            (-iota 5 1))))
+    `(progn
+       ,@(--map `(defun ,(nth (1- it) fn-name-lst) ()
+                   (interactive)
+                   (spotify--play-uri (plist-get (nth ,it spotify--search-result) :uri))
+                   (hydra-spotify/body))
+                (-iota 5 1)))))
 
-(defun spotify--play-3 ()
-  (interactive)
-  (spotify--play-uri (plist-get (nth 2 spotify--search-result) :uri))
-  (hydra-spotify/body))
 
-(defun spotify--play-4 ()
-  (interactive)
-  (spotify--play-uri (plist-get (nth 3 spotify--search-result) :uri))
-  (hydra-spotify/body))
+(spotify--setup-play-fns)
 
-(defun spotify--play-5 ()
-  (interactive)
-  (spotify--play-uri (plist-get (nth 3 spotify--search-result) :uri))
-  (hydra-spotify/body))
+;; (defun spotify--play-1 ()
+;;   (interactive)
+;;   (spotify--play-uri (plist-get (nth 0 spotify--search-result) :uri))
+;;   (hydra-spotify/body))
+
+;; (defun spotify--play-2 ()
+;;   (interactive)
+;;   (spotify--play-uri (plist-get (nth 1 spotify--search-result) :uri))
+;;   (hydra-spotify/body))
+
+;; (defun spotify--play-3 ()
+;;   (interactive)
+;;   (spotify--play-uri (plist-get (nth 2 spotify--search-result) :uri))
+;;   (hydra-spotify/body))
+
+;; (defun spotify--play-4 ()
+;;   (interactive)
+;;   (spotify--play-uri (plist-get (nth 3 spotify--search-result) :uri))
+;;   (hydra-spotify/body))
+
+;; (defun spotify--play-5 ()
+;;   (interactive)
+;;   (spotify--play-uri (plist-get (nth 3 spotify--search-result) :uri))
+;;   (hydra-spotify/body))
 
 
 ;; Defining the hydra (1)
+(defhydra hydra-spotify-list
+  (:color blue
+          :hint nil
+          :pre 1)
+  "
+id         Track                           Artist                        Album
+--------------------------------------------------------------------------------------
+_1_ : %s(sr--track 0)^^|  %s(sr--artist 0)^^|  %s(sr--album 0)
+_2_ : %s(sr--track 1)^^|  %s(sr--artist 1)^^|  %s(sr--album 1)
+_3_ : %s(sr--track 2)^^|  %s(sr--artist 2)^^|  %s(sr--album 2)
+_4_ : %s(sr--track 3)^^|  %s(sr--artist 3)^^|  %s(sr--album 3)
+_5_ : %s(sr--track 4)^^|  %s(sr--artist 4)^^|  %s(sr--album 4)
+
+"
+  ("1" spotify--play-1)
+  ("2" spotify--play-2)
+  ("3" spotify--play-3)
+  ("4" spotify--play-4)
+  ("5" spotify--play-5)
+  ("b" hydra-spotify/body "back")
+  ("q" nil "quit"))
+
+
+;; Defining the hydra (2)
 
 (defhydra hydra-spotify
   (:color pink
@@ -280,28 +304,6 @@ _i_  : fetch info              %s(identity spotify--playback)
   ("q" nil "quit" :color blue))
 
 
-;; Defining the hydra (2)
-(defhydra hydra-spot-test
-  (:color blue
-          :hint nil
-          :pre 1)
-  "
-id         Track                           Artist                        Album
---------------------------------------------------------------------------------------
-_1_ : %s(sr--track 0)^^|  %s(sr--artist 0)^^|  %s(sr--album 0)
-_2_ : %s(sr--track 1)^^|  %s(sr--artist 1)^^|  %s(sr--album 1)
-_3_ : %s(sr--track 2)^^|  %s(sr--artist 2)^^|  %s(sr--album 2)
-_4_ : %s(sr--track 3)^^|  %s(sr--artist 3)^^|  %s(sr--album 3)
-_5_ : %s(sr--track 4)^^|  %s(sr--artist 4)^^|  %s(sr--album 4)
-
-"
-  ("1" spotify--play-1)
-  ("2" spotify--play-2)
-  ("3" spotify--play-3)
-  ("4" spotify--play-4)
-  ("5" spotify--play-5)
-  ("b" hydra-spotify/body "back")
-  ("q" nil "quit"))
 
 
 
