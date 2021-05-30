@@ -13,9 +13,10 @@ on Macos. It is heavily inspired by the [[https://github.com/hnarayanan/shpotify
 
 2. Add the following to your config file:
 
-   #+begin_src emacs-lisp
-     (use-package elspot)
-   #+end_src
+   
+#+begin_src emacs-lisp
+  (use-package elspot)
+#+end_src
 
 or just:
 
@@ -43,10 +44,12 @@ developer account with Spotify.
    you are using that path, then you're all set. If you want to configure that, then
    do something like:
 
-   #+begin_src emacs-lisp
-     (use-package elspot
-       :config (setq SPOTIFY-CLIENT-FILEPATH "/path/to/your/key/file"))
-   #+end_src
+   
+ #+begin_src emacs-lisp
+   (use-package elspot
+     :config
+     (setq SPOTIFY-CLIENT-FILEPATH "/path/to/your/key/file"))
+ #+end_src
 
 
 ** Todo
