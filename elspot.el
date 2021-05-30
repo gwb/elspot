@@ -32,6 +32,9 @@
       (s-truncate len str)
       (s-pad-right len " " str)))
 
+(defun s-chop (fix s)
+  (s-chop-prefix fix
+                 (s-chop-suffix fix s)))
 
 ;; Workhorse macros for interacting with spotify via Applescript
 (defmacro spotify--tell (&rest strings)
