@@ -1,0 +1,6 @@
+# TODO
+
+- Allow setting up repeat / shuffle from menu
+- Allow display list of albums (instead of tracks)
+- Allow adding list of favorite playlists
+- Fix list display to show 5 entries
