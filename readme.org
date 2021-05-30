@@ -1,4 +1,57 @@
-# TODO
+
+* Elspot
+** Synopsis
+Elspot is an Emacs package providing simple commands for controlling spotify from within Emacs,
+on Macos. It is heavily inspired by the [[https://github.com/hnarayanan/shpotify][Shpotify]] script.
+
+** Installation
+
+*** Minimal
+
+1. Add the `elspot.el' file somewhere on your emacs load path (alternatively, you
+   can clone the repo).
+
+2. Add the following to your config file:
+
+   #+begin_src emacs-lisp
+     (use-package elspot)
+   #+end_src
+
+or just:
+
+#+begin_src emacs-lisp
+  (require 'elspot)
+#+end_src
+
+
+*** Complete
+
+The previous step will allow you to issue some basic commands to spotify:
+- play / pause the current song
+- skip to next song
+- go to previous song
+and will show some basic playback information.
+
+However, if you want to be able to search for a song and play it --- all within
+Emacs --- then you need a few more steps. This is because searching for songs
+requires querying the Spotify web API, which requires you to setup a (free)
+developer account with Spotify.
+
+1. Setup a free developer account and save your CLIENT_ID and CLIENT_SECRET
+   into a file. See the `connecting to Spotify's API' section from Shpotify's [[https://github.com/hnarayanan/shpotify][README]].
+2. By default, Elspot will read your id and secret key from `${HOME}/.shpotify.cfg'. If
+   you are using that path, then you're all set. If you want to configure that, then
+   do something like:
+
+   #+begin_src emacs-lisp
+     (use-package elspot
+       :config (setq SPOTIFY-CLIENT-FILEPATH "/path/to/your/key/file"))
+   #+end_src
+
+
+** Todo
+
+The package is intentionally minimalist --- I'm basically scratching my own itch. I've implemented most of the features I actually want, but there are a few extras that I'll probably add at some point.
 
 - Allow setting up repeat / shuffle from menu
 - Allow display list of albums (instead of tracks)
