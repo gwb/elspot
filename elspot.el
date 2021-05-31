@@ -15,29 +15,44 @@
 
 ;; A few string utilities 
 (defun s-surround (by-what str)
+  "Returns STR prefixed and postfixed by BY-WHAT."
   (s-concat by-what str by-what))
 
 (defun s-join+ (separator &rest strings)
+  "Concatenates the strings provided as argument, inserting
+SEPARATOR between then.
+"
   (s-join separator strings))
 
 (defun s-join-prepend (separator strings)
+  "Same as `s-join+' but also prepend SEPARATOR to
+the result."
   (s-prepend separator
              (s-join separator strings)))
 
 (defun s-quote (str)
+  "Inserts \" around string STR. "
   (s-surround "\"" str))
 
 (defun s-fit (str len)
+  "If STR is longer than LEN, truncate it. If it's
+shorter, pad it right with spaces."
   (if (> (length str) len)
       (s-truncate len str)
-      (s-pad-right len " " str)))
+    (s-pad-right len " " str)))
 
 (defun s-chop (fix s)
+  "Removes FIX from beginning and end of string S if
+there."
   (s-chop-prefix fix
                  (s-chop-suffix fix s)))
 
 ;; Workhorse macros for interacting with spotify via Applescript
 (defmacro spotify--tell (&rest strings)
+  "Builds an osascript request from STRINGS. This function just
+creates a string request, it does not execute anything. See the
+`spotify--cmd' function for actually running commands.
+ "
   (let ((part1 (s-join+ " -e "
                         "osascript"
                         "'tell application \"Spotify\"'"))
@@ -50,18 +65,18 @@
                        '(,part3))))))
 
 (defmacro spotify--cmd (&rest strings)
+  "Wraps the STRINGS into a spotify command and executes it."
   `(s-chomp (shell-command-to-string (spotify--tell ,@strings))))
 
 
 ;; Interactive commands for spotify
-(defun spotify--format-str-duration (str-duration &optional normalize)
-  (format-seconds "%m : %s"
-                  (/ (string-to-number str-duration) (or normalize 1))))
-
 (defun spotify--t/f-to-boolean (str)
+  "Converts strings true / false to t / nil."
   (equal str "true"))
 
 (defun spotify--playback-status ()
+  "Returns the playback status (shuffling, repeating, neither).
+"
   (let ((shuffling (spotify--t/f-to-boolean (spotify--cmd "shuffling")))
         (repeating (spotify--t/f-to-boolean (spotify--cmd "repeating"))))
     (--> ""
@@ -69,6 +84,9 @@
       (if repeating (s-concat it "[repeating] ") it))))
 
 (defun spotify-refresh-info ()
+  "Saves info about currently playing song into four variables
+`spotify--track', `spotify--artist', `spotify--album',
+`spotify--playback'."
   (interactive)
   (setq spotify--track (spotify--cmd "name of current track"))
   (setq spotify--artist (spotify--cmd "artist of current track"))
@@ -76,6 +94,7 @@
   (setq spotify--playback (spotify--playback-status)))
 
 (defun spotify-playpause ()
+  "If a song is playing, pauses it. If not, play the current song."
   (interactive)
   (let ((cur-status (spotify--cmd "player state as string")))
     (if (s-equals? cur-status "playing")
@@ -85,11 +104,13 @@
     (spotify-refresh-info)))
 
 (defun spotify-next ()
+  "Skips to the next song."
   (interactive)
   (spotify--cmd "next track")
   (spotify-refresh-info))
 
 (defun spotify-previous ()
+  "Skips to the previous song."
   (interactive)
   (spotify--cmd "set player position to 0" "previous track")
   (spotify-refresh-info))
@@ -98,6 +119,8 @@
 ;; Dealing with the search API
 
 (defun spotify--read-client-info ()
+  "Reads CLIENT_ID and CLIENT_SECRET from file SPOTIFY-CLIENT_FILEPATH
+and returns a plist '(:client-id <id> :client-secret <secret>)."
   (let* ((client-info-raw (with-temp-buffer
                             (insert-file-contents SPOTIFY-CLIENT-FILEPATH)
                             (buffer-string)))
@@ -107,6 +130,8 @@
           :client-secret (s-chop "\"" (cadr (assoc "CLIENT_SECRET" client-info-alist))))))
 
 (defun spotify--get-credentials ()
+  "Gets client information and construct authentication key with
+correct encoding."
   (let ((client-info (spotify--read-client-info)))
     (->> (s-concat (plist-get client-info :client-id)
                    ":"
@@ -115,8 +140,8 @@
       (s-replace "\n" "")
       (s-replace "\r" ""))))
 
-
 (defun spotify--build-access-token-query ()
+  "Constructs authentication request string (but does not execute it)."
   (s-join+ " "
            "curl"
            SPOTIFY_TOKEN_URI
@@ -126,22 +151,25 @@
                                    (spotify--get-credentials))) 
            "-d" "grant_type=client_credentials"))
 
-
 (defun spotify--fetch-access-token ()
+  "Authenticates with the spotify web API and gets and access
+token from the server."
   (let* ((query-result-raw (shell-command-to-string (spotify--build-access-token-query)))
          (access_token (gethash "access_token" (json-parse-string query-result-raw))))
     (setq spotify-access-token access_token)
     access_token))
 
-
 (defun spotify--get-access-token (&optional force-refresh-token)
+  "Returns access-token. If non-nil optional argument FORCE-REFRESH-TOKEN
+is provided, fetches the token from the website. If not, uses saved token."
   (if force-refresh-token
       (spotify--fetch-access-token)
     spotify-access-token))
 
-
-
 (defun spotify--build-search-query (args type limit offset access-token)
+  "Constructs a search query for term SEARCH. TYPE can be a string
+(track, album, artist). ACCESS-TOKEN can be obtained from function
+`spotify--get-access-token'."
   (s-join+ " "
            "curl"
            "-s" "-G"
@@ -157,32 +185,38 @@
 
 
 (defun spotify--parse-search-query-result (query-result-string)
+  "Parses the raw string from QUERY-RESULT-STRING into a list of
+plists, whose entries are of the form '(:name .. :artist .. :album .. :uri)"
   (cl-flet ((get-track (entry) (gethash "name" entry))
             (get-uri (entry) (gethash "uri" entry))
             (get-album (entry) (gethash "name" (gethash "album" entry)))
             (get-artists (entry) (--map (gethash "name" it)
                                         (gethash "artists" entry)))) 
-           (let ((entries (gethash "items"
-                                   (gethash "tracks"
-                                            (json-parse-string query-result-string)))))
-             (--map (list
-                     :name (get-track it)
-                     :artists (get-artists it)
-                     :album (get-album it)
-                     :uri (get-uri it))
-                    entries))))
+    (let ((entries (gethash "items"
+                            (gethash "tracks"
+                                     (json-parse-string query-result-string)))))
+      (--map (list
+              :name (get-track it)
+              :artists (get-artists it)
+              :album (get-album it)
+              :uri (get-uri it))
+             entries))))
 
 (defun spotify--token-error? (query-result)
+  "Returns t if the raw string QUERY-RESULT returned by
+the API is an error (most likely an authentication error)"
   (gethash "error" query-result))
 
 (defun spotify--search-api (search type limit offset force-refresh-token)
+  "Constructs and executes a search on the API. Returns a list of
+plists. See `spotify--parse-search-query-results' for return format."
   (let* ((access-token (spotify--get-access-token force-refresh-token))
-        (query-result-raw (shell-command-to-string
-                           (spotify--build-search-query
-                            search
-                            type limit
-                            offset
-                            access-token))))
+         (query-result-raw (shell-command-to-string
+                            (spotify--build-search-query
+                             search
+                             type limit
+                             offset
+                             access-token))))
     (if (spotify--token-error? (json-parse-string query-result-raw))
         (if force-refresh-token
             (error "Error could not authenticate, even with fresh token")
@@ -193,32 +227,40 @@
 
 ;; User interface
 (defun spotify-hydra-search-api (search)
+  "Excecutes a track search for terms in SEARCH on Spotify's API.
+Displays list of result in a hydra."
   (setq spotify--search-result (spotify--search-api search "track" 4 0 nil))
   (hydra-spotify-list/body))
 
 
 (defun spotify-prompt-search ()
+  "Prompt the user for a search query in the minibuffer."
   (interactive)
   (ivy-read "Query: "
             nil
             :action #'spotify-hydra-search-api))
 
 (defun sr--track (idx)
+  "Returns string containing track name, fitting it to length 30."
   (s-fit (plist-get (nth idx spotify--search-result) :name) 30))
 
 (defun sr--artist (idx)
+  "Returns string containing artist name, fitting it to length 30."
   (s-fit (s-join " + " (plist-get (nth idx spotify--search-result) :artists)) 25))
 
 (defun sr--album (idx)
+  "Returns string containing album name, fitting it to length 30."
   (s-fit (plist-get (nth idx spotify--search-result) :album) 25))
 
-
 (defun spotify--play-uri (uri)
+  "Returns string containing album name, fitting it to length 30."
   (let ((cmd (format "play track \"%s\"" uri)))
     (spotify--cmd cmd)))
 
 
 (defmacro spotify--setup-play-fns ()
+  "Constructs functions that will be hooked up to the hydra-spotify-list
+hydra."
   (let ((fn-name-lst (--map (intern (format "spotify--play-%s" it))
                             (-iota 5 1))))
     `(progn
@@ -228,33 +270,7 @@
                    (hydra-spotify/body))
                 (-iota 5 1)))))
 
-
 (spotify--setup-play-fns)
-
-;; (defun spotify--play-1 ()
-;;   (interactive)
-;;   (spotify--play-uri (plist-get (nth 0 spotify--search-result) :uri))
-;;   (hydra-spotify/body))
-
-;; (defun spotify--play-2 ()
-;;   (interactive)
-;;   (spotify--play-uri (plist-get (nth 1 spotify--search-result) :uri))
-;;   (hydra-spotify/body))
-
-;; (defun spotify--play-3 ()
-;;   (interactive)
-;;   (spotify--play-uri (plist-get (nth 2 spotify--search-result) :uri))
-;;   (hydra-spotify/body))
-
-;; (defun spotify--play-4 ()
-;;   (interactive)
-;;   (spotify--play-uri (plist-get (nth 3 spotify--search-result) :uri))
-;;   (hydra-spotify/body))
-
-;; (defun spotify--play-5 ()
-;;   (interactive)
-;;   (spotify--play-uri (plist-get (nth 3 spotify--search-result) :uri))
-;;   (hydra-spotify/body))
 
 
 ;; Defining the hydra (1)
@@ -305,12 +321,6 @@ _i_  : fetch info              %s(identity spotify--playback)
   ("i" spotify-refresh-info)
   ("s" spotify-prompt-search "search" :color blue)
   ("q" nil "quit" :color blue))
-
-
-
-
-
-
 
 
 (provide 'elspot)
